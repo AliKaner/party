@@ -183,7 +183,7 @@ function MultiplayerGame({ room, token, meId }: { room: RoomData; token: string;
   const [lockedWord, setLockedWord] = useState<string | null>(null);
 
   const myPlayer = room.players.find((p) => p.userId === meId);
-  const answered = !!round?.answeredUserIds.includes(meId as Id<"users">);
+  const answered = !!round?.answeredUserIds?.includes(meId as Id<"users">);
 
   const myBonus = myPlayer?.bonusSeconds ?? 0;
   const timeLimit = BASE_TIME_S + myBonus;
@@ -296,8 +296,8 @@ function MultiplayerGame({ room, token, meId }: { room: RoomData; token: string;
       modeTitle={modeTitle}
       phase={phase}
       countdownVal={countdownVal}
-      promptLetter={round?.prompt.letter ?? ""}
-      promptTiles={round?.prompt.tiles ?? []}
+      promptLetter={round?.prompt?.letter ?? ""}
+      promptTiles={round?.prompt?.tiles ?? []}
       timeLeft={timeLeft}
       timeLimit={timeLimit}
       showBonusPop={showBonusPop}
@@ -309,7 +309,7 @@ function MultiplayerGame({ room, token, meId }: { room: RoomData; token: string;
       }}
       players={players}
       feed={feed.map((f) => ({ id: f.id, text: f.text, kind: f.kind }))}
-      promptKey={isLetterMode ? round?.prompt.letter ?? "L" : round?.n ?? 0}
+      promptKey={isLetterMode ? round?.prompt?.letter ?? "L" : round?.n ?? 0}
       inputKey={isLetterMode ? "sticky" : round?.n ?? 0}
       stickyPrompt={isLetterMode}
     />
