@@ -15,7 +15,8 @@ import GameEndView from "@/components/game/GameEndView";
 import WordSpies from "@/components/game/WordSpies";
 import { useRequireAuth } from "@/lib/auth";
 import { BASE_TIME_S, GameMode, MODES } from "@/lib/constants";
-import { isValidWord, letterCounts, wordFitsLetters } from "@/lib/words";
+import { letterCounts, wordFitsLetters } from "@/lib/words";
+import { checkRealWord, preloadDictionary } from "@/lib/wordcheck";
 import { ensureAudio, playSound } from "@/lib/sounds";
 
 type RoomData = NonNullable<ReturnType<typeof useRoom>>;
@@ -171,6 +172,9 @@ function MultiplayerGame({ room, token, meId }: { room: RoomData; token: string;
 
   const offsetRef = useRef(0);
   useEffect(() => {
+    preloadDictionary();
+  }, []);
+  useEffect(() => {
     if (round) offsetRef.current = round.serverNow - Date.now();
   }, [round]);
   const now = useNow(offsetRef, true);
@@ -246,9 +250,11 @@ function MultiplayerGame({ room, token, meId }: { room: RoomData; token: string;
     async (word: string): Promise<string | null> => {
       if (!round || phase !== "active" || answered) return null;
       // Instant client-side pre-validation (mirrors server rules + copy).
+      // checkRealWord returns null while the big dictionary is still loading —
+      // in that case we let the server (authoritative) decide.
       if (!word) return "Type a word.";
       if (room.usedWords.includes(word)) return "That word was already used.";
-      if (!isValidWord(word)) return "Not a valid word.";
+      if (checkRealWord(word) === false) return "Not a valid word.";
       if (room.mode === "anagram") {
         const counts = letterCounts((round.prompt.tiles ?? []).join(""));
         if (!wordFitsLetters(word, counts)) return "You can only use the given letters.";

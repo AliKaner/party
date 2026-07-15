@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireUser } from "./helpers";
 import { getDailyWordForToday } from "../src/lib/words";
+import { isDictionaryWord } from "../src/lib/dictionary";
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -67,6 +68,7 @@ export const submitGuess = mutation({
     if (guess.length !== info.word.length || !/^[A-Z]+$/.test(guess)) {
       throw new ConvexError(`Enter a ${info.word.length}-letter word.`);
     }
+    if (!isDictionaryWord(guess)) throw new ConvexError("Not a valid word.");
     const date = todayKey();
     let progress = await ctx.db
       .query("dailyProgress")

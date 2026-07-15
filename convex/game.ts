@@ -6,12 +6,12 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import {
   getRandomLetter,
-  isValidWord,
   letterCounts,
   scrambleRoundLetters,
   wordFitsLetters,
   WORDS_BY_LETTER,
 } from "../src/lib/words";
+import { isDictionaryWord } from "../src/lib/dictionary";
 import {
   BASE_TIME_S,
   COUNTDOWN_TOTAL_MS,
@@ -218,7 +218,7 @@ export const submitWord = mutation({
     const word = args.word.trim().toUpperCase();
     if (!word) throw new ConvexError("Type a word.");
     if (room.usedWords.includes(word)) throw new ConvexError("That word was already used.");
-    if (!isValidWord(word)) throw new ConvexError("Not a valid word.");
+    if (!isDictionaryWord(word)) throw new ConvexError("Not a valid word.");
     if (room.mode === "anagram") {
       const counts = letterCounts((round.prompt.tiles ?? []).join(""));
       if (!wordFitsLetters(word, counts)) {

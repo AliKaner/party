@@ -21,12 +21,12 @@ import {
 } from "@/lib/constants";
 import {
   getRandomLetter,
-  isValidWord,
   letterCounts,
   scrambleRoundLetters,
   wordFitsLetters,
   WORDS_BY_LETTER,
 } from "@/lib/words";
+import { isRealWord, preloadDictionary } from "@/lib/wordcheck";
 import { ensureAudio, playSound } from "@/lib/sounds";
 
 type PracticeMode = Exclude<GameMode, "wordspies">;
@@ -70,6 +70,9 @@ export default function PracticePage() {
     timers.current = [];
   }, []);
   useEffect(() => clearTimers, [clearTimers]);
+  useEffect(() => {
+    preloadDictionary();
+  }, []);
 
   const pushFeed = (text: string, kind: FeedItem["kind"]) => {
     const e = eng.current;
@@ -213,7 +216,7 @@ export default function PracticePage() {
     if (!e || e.phase !== "active") return null;
     if (!word) return "Type a word.";
     if (e.usedWords.includes(word)) return "That word was already used.";
-    if (!isValidWord(word)) return "Not a valid word.";
+    if (!isRealWord(word)) return "Not a valid word.";
     if (e.mode === "anagram") {
       if (!wordFitsLetters(word, letterCounts(e.promptTiles.join("")))) {
         return "You can only use the given letters.";

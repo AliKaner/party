@@ -7,6 +7,7 @@ import { api } from "../../../convex/_generated/api";
 import AppShell from "@/components/AppShell";
 import { useRequireAuth } from "@/lib/auth";
 import { QWERTY } from "@/lib/constants";
+import { checkRealWord, preloadDictionary } from "@/lib/wordcheck";
 import { ensureAudio, playSound } from "@/lib/sounds";
 
 type TileState = "correct" | "present" | "absent";
@@ -27,6 +28,7 @@ export default function DailyPage() {
 
   useEffect(() => {
     ensureAudio();
+    preloadDictionary();
   }, []);
 
   const wordLen = daily?.length ?? 5;
@@ -37,6 +39,11 @@ export default function DailyPage() {
     const guess = current.trim().toUpperCase();
     if (guess.length !== wordLen) {
       setError(`Enter a ${wordLen}-letter word.`);
+      return;
+    }
+    if (checkRealWord(guess) === false) {
+      setError("Not a valid word.");
+      playSound("wrong");
       return;
     }
     setBusy(true);
