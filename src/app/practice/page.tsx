@@ -60,7 +60,6 @@ export default function PracticePage() {
   const [view, setView] = useState<Engine | null>(null);
   const [showBonusPop, setShowBonusPop] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const roundStart = useRef(0);
   const feedId = useRef(0);
 
   const commit = () => setView(eng.current ? { ...eng.current } : null);
@@ -126,46 +125,54 @@ export default function PracticePage() {
     commit();
   };
 
+  const activateRound = (roundNum: number) => {
+    const cur = eng.current;
+    if (!cur || cur.round !== roundNum) return;
+    const limit = BASE_TIME_S + cur.bonus;
+    cur.phase = "active";
+    cur.timeLeft = limit;
+    cur.timeLimit = limit;
+    commit();
+    const interval = setInterval(() => {
+      const c = eng.current;
+      if (!c || c.phase !== "active" || c.round !== roundNum) {
+        clearInterval(interval);
+        return;
+      }
+      c.timeLeft = Math.max(0, c.timeLeft - 0.1);
+      if (c.timeLeft <= 3.05 && c.timeLeft > 0 && Math.abs(Math.round(c.timeLeft) - c.timeLeft) < 0.06) {
+        playSound("tick");
+      }
+      if (c.timeLeft <= 0) {
+        clearInterval(interval);
+        failRound();
+      } else {
+        commit();
+      }
+    }, 100);
+    timers.current.push(interval);
+  };
+
   const startRound = (roundNum: number) => {
     const e = eng.current;
     if (!e) return;
-    const prompt = buildPrompt(e.mode, roundNum, e.usedWords, e.wordLog);
+    // Start With a Letter keeps the same letter for the whole drill: no
+    // re-reveal, no pause — the next word can be typed immediately.
+    const letterRepeat = e.mode === "letter" && roundNum > 1 && e.promptLetter !== "";
+    const prompt = letterRepeat
+      ? { letter: e.promptLetter, tiles: [] as string[] }
+      : buildPrompt(e.mode, roundNum, e.usedWords, e.wordLog);
     e.round = roundNum;
-    e.phase = "reveal";
     e.promptLetter = prompt.letter;
     e.promptTiles = prompt.tiles;
+    if (letterRepeat) {
+      activateRound(roundNum);
+      return;
+    }
+    e.phase = "reveal";
     playSound("reveal");
     commit();
-    timers.current.push(
-      setTimeout(() => {
-        const cur = eng.current;
-        if (!cur || cur.round !== roundNum) return;
-        const limit = BASE_TIME_S + cur.bonus;
-        cur.phase = "active";
-        cur.timeLeft = limit;
-        cur.timeLimit = limit;
-        roundStart.current = Date.now();
-        commit();
-        const interval = setInterval(() => {
-          const c = eng.current;
-          if (!c || c.phase !== "active" || c.round !== roundNum) {
-            clearInterval(interval);
-            return;
-          }
-          c.timeLeft = Math.max(0, c.timeLeft - 0.1);
-          if (c.timeLeft <= 3.05 && c.timeLeft > 0 && Math.abs(Math.round(c.timeLeft) - c.timeLeft) < 0.06) {
-            playSound("tick");
-          }
-          if (c.timeLeft <= 0) {
-            clearInterval(interval);
-            failRound();
-          } else {
-            commit();
-          }
-        }, 100);
-        timers.current.push(interval);
-      }, REVEAL_MS)
-    );
+    timers.current.push(setTimeout(() => activateRound(roundNum), REVEAL_MS));
   };
 
   const beginCountdown = () => {
@@ -224,7 +231,8 @@ export default function PracticePage() {
     } else if (e.promptLetter && word[0] !== e.promptLetter) {
       return `Must start with "${e.promptLetter}".`;
     }
-    const elapsedMs = Date.now() - roundStart.current;
+    // Elapsed time derived from the countdown itself (100ms granularity).
+    const elapsedMs = Math.max(0, (e.timeLimit - e.timeLeft) * 1000);
     playSound("correct");
     pushFeed(`You: "${word}" correct`, "correct");
     if (elapsedMs <= FAST_ANSWER_MS) {
@@ -236,6 +244,11 @@ export default function PracticePage() {
     }
     e.usedWords = [...e.usedWords, word];
     e.wordLog = [...e.wordLog, { round: e.round, word }];
+    if (e.mode === "letter") {
+      // Rapid-fire: next word immediately, same letter, fresh timer.
+      startRound(e.round + 1);
+      return null;
+    }
     e.phase = "gap";
     commit();
     timers.current.push(setTimeout(() => startRound(e.round + 1), NEXT_ROUND_GAP_MS));
@@ -288,6 +301,9 @@ export default function PracticePage() {
           onLeave={() => { clearTimers(); eng.current = null; setView(null); }}
           players={[{ id: "me", name: me.username, hue: me.avatarHue, url: me.avatarUrl, lives: view.lives, eliminated: view.phase === "eliminated" }]}
           feed={view.feed}
+          promptKey={view.mode === "letter" ? view.promptLetter || "L" : view.round}
+          inputKey={view.mode === "letter" ? "sticky" : view.round}
+          stickyPrompt={view.mode === "letter"}
         />
       </div>
     );

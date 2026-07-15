@@ -42,11 +42,15 @@ async function feed(
   await ctx.db.insert("feedEvents", { roomId, text, kind, at: Date.now() });
 }
 
-function buildPrompt(room: Doc<"rooms">, roundNum: number) {
+function buildPrompt(room: Doc<"rooms">, roundNum: number, prevLetter?: string) {
   const used = new Set(room.usedWords);
   if (room.mode === "anagram") {
     const { letters } = scrambleRoundLetters(used);
     return { tiles: letters };
+  }
+  // Start With a Letter picks one letter for the whole match.
+  if (room.mode === "letter" && roundNum > 1 && prevLetter) {
+    return { letter: prevLetter };
   }
   if (room.mode === "chain" && roundNum > 1) {
     const lastWords = room.wordLog.filter((w) => w.round === roundNum - 1);
@@ -69,12 +73,22 @@ async function createRound(
 ) {
   const alive = await alivePlayers(ctx, room._id);
   const maxBonus = alive.reduce((m, p) => Math.max(m, p.bonusSeconds), 0);
-  const activeAt = revealAt + REVEAL_MS;
+  let prevLetter: string | undefined;
+  if (room.mode === "letter" && n > 1) {
+    const prev = await ctx.db
+      .query("rounds")
+      .withIndex("by_room", (q) => q.eq("roomId", room._id).eq("n", n - 1))
+      .unique();
+    prevLetter = prev?.prompt.letter;
+  }
+  // After round 1 the letter mode's prompt is already known, so there is no
+  // reveal pause — players can fire words back-to-back.
+  const activeAt = room.mode === "letter" && n > 1 ? revealAt : revealAt + REVEAL_MS;
   const endsAt = activeAt + (BASE_TIME_S + maxBonus) * 1000;
   const roundId = await ctx.db.insert("rounds", {
     roomId: room._id,
     n,
-    prompt: buildPrompt(room, n),
+    prompt: buildPrompt(room, n, prevLetter),
     revealAt,
     activeAt,
     endsAt,
@@ -319,7 +333,9 @@ async function resolveRoundInner(ctx: MutationCtx, roomId: Id<"rooms">, n: numbe
     return;
   }
 
-  await createRound(ctx, (await ctx.db.get(roomId))!, n + 1, Date.now() + NEXT_ROUND_GAP_MS);
+  // Letter mode chains rounds near-instantly (same prompt, no reveal).
+  const gap = room.mode === "letter" ? 300 : NEXT_ROUND_GAP_MS;
+  await createRound(ctx, (await ctx.db.get(roomId))!, n + 1, Date.now() + gap);
 }
 
 export const resolveRound = internalMutation({
