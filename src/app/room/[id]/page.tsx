@@ -280,6 +280,7 @@ function MultiplayerGame({ room, token, meId }: { room: RoomData; token: string;
   );
 
   const modeTitle = MODES.find((m) => m.key === room.mode)?.title ?? "";
+  const isLetterMode = room.mode === "letter";
   const players = room.players.map((p) => ({
     id: p.userId,
     name: p.username,
@@ -308,6 +309,9 @@ function MultiplayerGame({ room, token, meId }: { room: RoomData; token: string;
       }}
       players={players}
       feed={feed.map((f) => ({ id: f.id, text: f.text, kind: f.kind }))}
+      promptKey={isLetterMode ? round?.prompt.letter ?? "L" : round?.n ?? 0}
+      inputKey={isLetterMode ? "sticky" : round?.n ?? 0}
+      stickyPrompt={isLetterMode}
     />
   );
 }

@@ -39,9 +39,17 @@ const FEED_COLORS: Record<FeedItem["kind"], string> = {
   info: "var(--faint)",
 };
 
-/** Owns the word input for one round — mounted with key={roundN} so its
- *  state resets naturally when the round advances. */
-function AnswerBox({ onSubmitWord }: { onSubmitWord: (word: string) => Promise<string | null> | string | null }) {
+/** Owns the word input — mounted with a parent-chosen key so its state
+ *  resets when the parent wants (per round, or kept across rounds in
+ *  Start With a Letter). While `disabled`, typing works but submitting
+ *  (Enter or the button) is a no-op, so players can pre-type. */
+function AnswerBox({
+  onSubmitWord,
+  disabled = false,
+}: {
+  onSubmitWord: (word: string) => Promise<string | null> | string | null;
+  disabled?: boolean;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
@@ -49,8 +57,12 @@ function AnswerBox({ onSubmitWord }: { onSubmitWord: (word: string) => Promise<s
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+  useEffect(() => {
+    if (!disabled) inputRef.current?.focus();
+  }, [disabled]);
 
   const submit = async () => {
+    if (disabled) return;
     const word = value.trim().toUpperCase();
     const err = await onSubmitWord(word);
     if (err) {
@@ -58,6 +70,7 @@ function AnswerBox({ onSubmitWord }: { onSubmitWord: (word: string) => Promise<s
     } else {
       setValue("");
       setError("");
+      inputRef.current?.focus();
     }
   };
 
@@ -73,7 +86,7 @@ function AnswerBox({ onSubmitWord }: { onSubmitWord: (word: string) => Promise<s
           onKeyDown={(e) => { if (e.key === "Enter") void submit(); }}
           placeholder="TYPE A WORD"
         />
-        <button className="pb-btn" onClick={() => void submit()}>SUBMIT</button>
+        <button className="pb-btn" disabled={disabled} onClick={() => void submit()}>SUBMIT</button>
       </div>
       {error && (
         <div className="anim-shake" style={{ color: "var(--danger)", fontSize: 13, fontWeight: 700 }}>
@@ -100,6 +113,9 @@ export default function GameView({
   players,
   feed,
   hideSidebar = false,
+  promptKey,
+  inputKey,
+  stickyPrompt = false,
 }: {
   roundN: number;
   modeTitle: string;
@@ -116,11 +132,25 @@ export default function GameView({
   players: GamePlayer[];
   feed: FeedItem[];
   hideSidebar?: boolean;
+  /** Keys the flip animation — pass a stable value (e.g. the letter itself)
+   *  to avoid re-playing the reveal when the prompt hasn't changed. */
+  promptKey?: string | number;
+  /** Keys the input — pass a stable value to keep typed text across rounds. */
+  inputKey?: string | number;
+  /** Keep the prompt (and input) on screen between rounds — Start With a
+   *  Letter uses one letter for the whole match. */
+  stickyPrompt?: boolean;
 }) {
   const frac = timeLimit > 0 ? Math.max(0, Math.min(1, timeLeft / timeLimit)) : 0;
   const barColor = frac > 0.5 ? "var(--success)" : frac > 0.25 ? "var(--warning)" : "var(--danger)";
+  const tileKey = promptKey ?? roundN;
+  const boxKey = inputKey ?? roundN;
   const showPrompt =
-    (phase === "reveal" || phase === "active") && (promptLetter !== "" || promptTiles.length > 0);
+    (phase === "reveal" || phase === "active" || (stickyPrompt && phase === "gap")) &&
+    (promptLetter !== "" || promptTiles.length > 0);
+  const showInput =
+    (phase === "countdown" || phase === "reveal" || phase === "active" || phase === "gap") &&
+    !answeredWord;
 
   return (
     <div className="min-h-screen flex flex-col relative z-10">
@@ -182,7 +212,7 @@ export default function GameView({
                 <div className="flex flex-wrap justify-center gap-2.5" style={{ perspective: 700 }}>
                   {promptTiles.map((ch, i) => (
                     <div
-                      key={`${roundN}-${i}`}
+                      key={`${tileKey}-${i}`}
                       className="anim-flip font-display flex items-center justify-center"
                       style={{
                         width: 56,
@@ -202,7 +232,7 @@ export default function GameView({
               ) : (
                 <div style={{ perspective: 700 }}>
                   <div
-                    key={roundN}
+                    key={tileKey}
                     className="anim-flip font-display flex items-center justify-center"
                     style={{
                       width: 140,
@@ -220,42 +250,45 @@ export default function GameView({
                 </div>
               )}
 
-              {phase === "active" && (
-                <div className="w-full flex flex-col gap-3" style={{ maxWidth: 420 }}>
-                  {answeredWord ? (
-                    <div className="text-center" style={{ fontSize: 15, fontWeight: 800, color: "var(--success)" }}>
-                      &quot;{answeredWord}&quot; locked in — waiting for the others…
-                    </div>
-                  ) : (
-                    <AnswerBox key={roundN} onSubmitWord={onSubmitWord} />
-                  )}
-                  <div className="relative">
-                    {showBonusPop && (
-                      <div
-                        className="anim-bonuspop absolute font-display"
-                        style={{ right: 8, top: -26, color: "var(--success)", fontWeight: 700, fontSize: 18 }}
-                      >
-                        +2s
-                      </div>
-                    )}
-                    <div style={{ height: 14, borderRadius: 100, background: "var(--hairline)", overflow: "hidden" }}>
-                      <div
-                        style={{
-                          width: `${frac * 100}%`,
-                          height: "100%",
-                          borderRadius: 100,
-                          background: barColor,
-                          transition: "width 0.1s linear, background 0.3s",
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </>
           )}
 
-          {(phase === "gap" || phase === "waiting") && (
+          {phase === "active" && answeredWord && (
+            <div className="text-center" style={{ fontSize: 15, fontWeight: 800, color: "var(--success)" }}>
+              &quot;{answeredWord}&quot; locked in — waiting for the others…
+            </div>
+          )}
+
+          {showInput && (
+            <div className="w-full flex flex-col gap-3" style={{ maxWidth: 420 }}>
+              <AnswerBox key={boxKey} onSubmitWord={onSubmitWord} disabled={phase !== "active"} />
+              {phase === "active" && (
+                <div className="relative">
+                  {showBonusPop && (
+                    <div
+                      className="anim-bonuspop absolute font-display"
+                      style={{ right: 8, top: -26, color: "var(--success)", fontWeight: 700, fontSize: 18 }}
+                    >
+                      +2s
+                    </div>
+                  )}
+                  <div style={{ height: 14, borderRadius: 100, background: "var(--hairline)", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        width: `${frac * 100}%`,
+                        height: "100%",
+                        borderRadius: 100,
+                        background: barColor,
+                        transition: "width 0.1s linear, background 0.3s",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {(phase === "waiting" || (phase === "gap" && !stickyPrompt)) && (
             <div style={{ fontSize: 14, fontWeight: 700, color: "var(--muted)" }}>
               {phase === "waiting" ? "Time is up — waiting for the round to resolve…" : "Next round…"}
             </div>
