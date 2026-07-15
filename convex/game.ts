@@ -1,7 +1,7 @@
 import { internalMutation, mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
-import { requireUser } from "./helpers";
+import { optionalUser, requireUser } from "./helpers";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import {
@@ -37,9 +37,10 @@ async function feed(
   ctx: MutationCtx,
   roomId: Id<"rooms">,
   text: string,
-  kind: "correct" | "bonus" | "wrong" | "eliminate" | "info"
+  kind: "correct" | "bonus" | "wrong" | "eliminate" | "info",
+  extra?: { userId: Id<"users">; word: string }
 ) {
-  await ctx.db.insert("feedEvents", { roomId, text, kind, at: Date.now() });
+  await ctx.db.insert("feedEvents", { roomId, text, kind, at: Date.now(), ...extra });
 }
 
 function buildPrompt(room: Doc<"rooms">, roundNum: number, prevLetter?: string) {
@@ -195,14 +196,24 @@ export const currentRound = query({
 });
 
 export const feedList = query({
-  args: { roomId: v.id("rooms") },
+  args: { roomId: v.id("rooms"), token: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const viewer = await optionalUser(ctx, args.token);
     const events = await ctx.db
       .query("feedEvents")
       .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
       .order("desc")
       .take(8);
-    return events.map((e) => ({ id: e._id, text: e.text, kind: e.kind, at: e.at }));
+    return events.map((e) => ({
+      id: e._id,
+      // The submitter sees their own word; everyone else sees the masked line.
+      text:
+        e.word && viewer && e.userId === viewer._id
+          ? `You: "${e.word}" correct`
+          : e.text,
+      kind: e.kind,
+      at: e.at,
+    }));
   },
 });
 
@@ -253,7 +264,11 @@ export const submitWord = mutation({
         { round: round.n, userId: user._id, name: user.username, word, hue: user.avatarHue },
       ],
     });
-    await feed(ctx, args.roomId, `${user.username}: "${word}" correct`, "correct");
+    // Other players must not see the word itself — only the submitter does.
+    await feed(ctx, args.roomId, `${user.username} found a word`, "correct", {
+      userId: user._id,
+      word,
+    });
 
     let gotBonus = false;
     if (ms <= FAST_ANSWER_MS) {

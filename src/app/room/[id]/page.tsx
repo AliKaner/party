@@ -165,7 +165,7 @@ function RoomLobby({ room, token, meId }: { room: RoomData; token: string; meId:
 function MultiplayerGame({ room, token, meId }: { room: RoomData; token: string; meId: string }) {
   const roomId = room.id as Id<"rooms">;
   const round = useQuery(api.game.currentRound, { roomId });
-  const feed = useQuery(api.game.feedList, { roomId }) ?? [];
+  const feed = useQuery(api.game.feedList, { roomId, token }) ?? [];
   const submitWord = useMutation(api.game.submitWord);
   const leave = useMutation(api.rooms.leave);
   const router = useRouter();
