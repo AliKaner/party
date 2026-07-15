@@ -216,3 +216,13 @@ export const setMode = mutation({
     await ctx.db.patch(args.roomId, { mode: args.mode });
   },
 });
+
+export const debugList = query({
+  args: {},
+  handler: async (ctx) => {
+    const rooms = await ctx.db.query("rooms").collect();
+    const players = await ctx.db.query("roomPlayers").collect();
+    return { rooms, players };
+  },
+});
+
