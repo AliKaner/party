@@ -8,8 +8,6 @@
  * @module
  */
 
-<<<<<<< HEAD
-=======
 import type * as daily from "../daily.js";
 import type * as game from "../game.js";
 import type * as helpers from "../helpers.js";
@@ -18,16 +16,12 @@ import type * as rooms from "../rooms.js";
 import type * as spies from "../spies.js";
 import type * as users from "../users.js";
 
->>>>>>> worktree-party-box-build
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-<<<<<<< HEAD
-declare const fullApi: ApiFromModules<{}>;
-=======
 declare const fullApi: ApiFromModules<{
   daily: typeof daily;
   game: typeof game;
@@ -37,7 +31,6 @@ declare const fullApi: ApiFromModules<{
   spies: typeof spies;
   users: typeof users;
 }>;
->>>>>>> worktree-party-box-build
 
 /**
  * A utility for referencing Convex functions in your app's public API.
