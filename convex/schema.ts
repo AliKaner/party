@@ -92,6 +92,11 @@ export default defineSchema({
       v.literal("info")
     ),
     at: v.number(),
+    // For correct-answer events: the submitter and their word. The word is
+    // only shown back to the submitter — other players just see that a
+    // word was found.
+    userId: v.optional(v.id("users")),
+    word: v.optional(v.string()),
   }).index("by_room", ["roomId"]),
 
   spiesGames: defineTable({
