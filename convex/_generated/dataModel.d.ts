@@ -8,6 +8,7 @@
  * @module
  */
 
+<<<<<<< HEAD
 import { AnyDataModel } from "convex/server";
 import type { GenericId } from "convex/values";
 
@@ -21,16 +22,40 @@ import type { GenericId } from "convex/values";
  *
  * After you change a schema, rerun codegen with `npx convex dev`.
  */
+=======
+import type {
+  DataModelFromSchemaDefinition,
+  DocumentByName,
+  TableNamesInDataModel,
+  SystemTableNames,
+} from "convex/server";
+import type { GenericId } from "convex/values";
+import schema from "../schema.js";
+>>>>>>> worktree-party-box-build
 
 /**
  * The names of all of your Convex tables.
  */
+<<<<<<< HEAD
 export type TableNames = string;
 
 /**
  * The type of a document stored in Convex.
  */
 export type Doc = any;
+=======
+export type TableNames = TableNamesInDataModel<DataModel>;
+
+/**
+ * The type of a document stored in Convex.
+ *
+ * @typeParam TableName - A string literal type of the table name (like "users").
+ */
+export type Doc<TableName extends TableNames> = DocumentByName<
+  DataModel,
+  TableName
+>;
+>>>>>>> worktree-party-box-build
 
 /**
  * An identifier for a document in Convex.
@@ -42,8 +67,15 @@ export type Doc = any;
  *
  * IDs are just strings at runtime, but this type can be used to distinguish them from other
  * strings when type checking.
+<<<<<<< HEAD
  */
 export type Id<TableName extends TableNames = TableNames> =
+=======
+ *
+ * @typeParam TableName - A string literal type of the table name (like "users").
+ */
+export type Id<TableName extends TableNames | SystemTableNames> =
+>>>>>>> worktree-party-box-build
   GenericId<TableName>;
 
 /**
@@ -55,4 +87,8 @@ export type Id<TableName extends TableNames = TableNames> =
  * This type is used to parameterize methods like `queryGeneric` and
  * `mutationGeneric` to make them type-safe.
  */
+<<<<<<< HEAD
 export type DataModel = AnyDataModel;
+=======
+export type DataModel = DataModelFromSchemaDefinition<typeof schema>;
+>>>>>>> worktree-party-box-build
